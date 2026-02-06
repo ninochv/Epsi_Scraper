@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+env/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Data files (will be mounted as volumes)
+*.db
+.fernet_key
+public/
+
+# Dev/test files
+*.ics
+debug_html/
+*.log
+
+# Docs
+*.md
+LICENSE

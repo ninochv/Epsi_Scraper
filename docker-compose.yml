@@ -1,0 +1,30 @@
+# ============================================
+# Docker Compose pour dev local et Dokploy
+# ============================================
+version: "3.8"
+
+services:
+  epsi-scraper:
+    build: .
+    container_name: epsi-scraper
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8080}:8080"
+    environment:
+      - PORT=8080
+      - REFRESH_MIN=${REFRESH_MIN:-60}
+      # Definir FERNET_KEY en production pour persister les mots de passe chiffres
+      - FERNET_KEY=${FERNET_KEY:-}
+    volumes:
+      # Volume pour les donnees persistantes (DB + fichiers ICS)
+      - epsi_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  epsi_data:
+    driver: local

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # server.py
 from __future__ import annotations
 import os
@@ -8,7 +8,7 @@ import secrets
 import datetime as dt
 from typing import Optional
 
-from flask import Flask, request, jsonify, Response, abort, render_template_string
+from flask import Flask, request, jsonify, Response, abort, render_template
 from cryptography.fernet import Fernet, InvalidToken
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -19,12 +19,31 @@ from wigor_to_calendar import (
 )
 
 # ================== CONFIG ==================
-DATABASE = os.getenv("EPSI_DB", "users.db")
-ICS_DIR = os.getenv("ICS_DIR", "public")
+# Repertoire de donnees (pour Docker, utiliser /data)
+DATA_DIR = os.getenv("DATA_DIR", os.path.dirname(__file__))
+os.makedirs(DATA_DIR, exist_ok=True)
+
+DATABASE = os.getenv("EPSI_DB", os.path.join(DATA_DIR, "users.db"))
+ICS_DIR = os.getenv("ICS_DIR", os.path.join(DATA_DIR, "public"))
 os.makedirs(ICS_DIR, exist_ok=True)
 
-# clé de chiffrement (met-en une persistante en prod)
-FERNET_KEY = os.getenv("FERNET_KEY") or Fernet.generate_key().decode()
+# cle de chiffrement - DOIT etre persistante en prod
+# Si non definie, on cree/charge depuis un fichier local dans DATA_DIR
+def _load_or_create_fernet_key() -> str:
+    key_file = os.path.join(DATA_DIR, ".fernet_key")
+    env_key = os.getenv("FERNET_KEY")
+    if env_key:
+        return env_key
+    if os.path.exists(key_file):
+        with open(key_file, "r") as f:
+            return f.read().strip()
+    # Creer une nouvelle cle et la sauvegarder
+    new_key = Fernet.generate_key().decode()
+    with open(key_file, "w") as f:
+        f.write(new_key)
+    return new_key
+
+FERNET_KEY = _load_or_create_fernet_key()
 FERNET = Fernet(FERNET_KEY.encode())
 
 # refresh toutes les heures
@@ -189,31 +208,9 @@ def refresh_all_users():
             app.logger.exception("Echec refresh %s: %s", u["username"], e)
 
 # ================== HTTP ==================
-INDEX_HTML = """
-<!doctype html>
-<meta charset="utf-8">
-<title>Wigor → ICS (refresh horaire, 14 jours)</title>
-<style>
-body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem}
-form{display:grid;gap:.75rem}
-input,button{padding:.6rem .8rem;font-size:1rem}
-label{font-weight:600}
-.small{font-size:.9rem;color:#555}
-code{background:#f6f8fa;padding:.15rem .3rem;border-radius:.25rem}
-</style>
-<h2>Exporter votre emploi du temps Wigor en ICS</h2>
-<p class="small">Identifiant + mot de passe. Le flux couvre les 14 prochains jours et se régénère toutes les heures.</p>
-<form method="post" action="/register">
-  <label>Identifiant Wigor <input name="username" required></label>
-  <label>Mot de passe <input name="password" type="password" required></label>
-  <button type="submit">Générer mon lien .ics</button>
-</form>
-<p class="small">Collez l’URL <code>/feed/&lt;token&gt;.ics</code> dans Google/Apple Calendar (abonnement).</p>
-"""
-
 @app.route("/", methods=["GET"])
 def index():
-    return render_template_string(INDEX_HTML)
+    return render_template("index.html")
 
 @app.route("/register", methods=["POST"])
 def register():
@@ -263,14 +260,30 @@ def feed(token):
 def healthz():
     return "ok"
 
-def main():
+# ================== INIT pour gunicorn ==================
+def _init_app():
+    """Initialise la DB et le scheduler. Appele au demarrage."""
     init_db()
-    SCHED.add_job(refresh_all_users, "interval", minutes=REFRESH_MIN, id="hourly_refresh", replace_existing=True)
-    SCHED.start()
+    if not SCHED.running:
+        SCHED.add_job(
+            refresh_all_users,
+            "interval",
+            minutes=REFRESH_MIN,
+            id="hourly_refresh",
+            replace_existing=True
+        )
+        SCHED.start()
+
+# Initialisation automatique (compatible gunicorn)
+_init_app()
+
+def main():
+    """Point d'entree pour execution directe (dev)."""
     try:
-        app.run(host="0.0.0.0", port=int(os.getenv("PORT", "8080")))
+        app.run(host="0.0.0.0", port=int(os.getenv("PORT", "8080")), debug=False)
     finally:
-        SCHED.shutdown()
+        if SCHED.running:
+            SCHED.shutdown()
 
 if __name__ == "__main__":
     main()

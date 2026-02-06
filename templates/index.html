@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wigor - ICS (refresh horaire, 14 jours)</title>
+<style>
+body{font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial,sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem;background:#fafbfc}
+form{display:grid;gap:.75rem}
+input,button{padding:.6rem .8rem;font-size:1rem;border:1px solid #ccc;border-radius:4px}
+button{background:#0066cc;color:#fff;border:none;cursor:pointer;transition:background .2s}
+button:hover{background:#0052a3}
+button:disabled{background:#999;cursor:wait}
+label{font-weight:600}
+.small{font-size:.9rem;color:#555}
+code{background:#e8f0fe;padding:.15rem .3rem;border-radius:.25rem;word-break:break-all}
+.result{margin-top:1rem;padding:1rem;border-radius:4px}
+.success{background:#d4edda;border:1px solid #28a745;color:#155724}
+.error{background:#f8d7da;border:1px solid #dc3545;color:#721c24}
+.hidden{display:none}
+a{color:#0066cc}
+</style>
+</head>
+<body>
+<h2>Exporter votre emploi du temps Wigor en ICS</h2>
+<p class="small">Identifiant + mot de passe. Le flux couvre les 14 prochains jours et se regenere toutes les heures.</p>
+<form id="regForm">
+  <label>Identifiant Wigor <input name="username" id="username" required placeholder="prenom.nom"></label>
+  <label>Mot de passe <input name="password" id="password" type="password" required></label>
+  <button type="submit" id="submitBtn">Generer mon lien .ics</button>
+</form>
+<div id="result" class="result hidden"></div>
+<p class="small">Collez l'URL <code>/feed/&lt;token&gt;.ics</code> dans Google/Apple Calendar (abonnement).</p>
+
+<script>
+document.getElementById('regForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  const resultDiv = document.getElementById('result');
+  btn.disabled = true;
+  btn.textContent = 'Generation en cours...';
+  resultDiv.className = 'result hidden';
+
+  try {
+    const resp = await fetch('/register', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        username: document.getElementById('username').value,
+        password: document.getElementById('password').value
+      })
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+      resultDiv.innerHTML = '<strong>Succes!</strong><br>Votre lien ICS:<br><code><a href="' + data.feed_url + '">' + data.feed_url + '</a></code><br><br>Copiez cette URL dans votre application calendrier (Google Calendar, Apple Calendar, Outlook...)';
+      resultDiv.className = 'result success';
+    } else {
+      resultDiv.innerHTML = '<strong>Erreur:</strong> ' + (data.error || 'Erreur inconnue');
+      resultDiv.className = 'result error';
+    }
+  } catch (err) {
+    resultDiv.innerHTML = '<strong>Erreur reseau:</strong> ' + err.message;
+    resultDiv.className = 'result error';
+  }
+  btn.disabled = false;
+  btn.textContent = 'Generer mon lien .ics';
+});
+</script>
+</body>
+</html>

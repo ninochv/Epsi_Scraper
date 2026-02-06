@@ -497,7 +497,8 @@ def build_ics(cours: List[Cours], prod_id: str = "-//EPSI Wigor → ICS//FR") ->
 # Range par défaut
 # ============================
 def default_two_weeks(today: dt.date) -> Tuple[dt.date, dt.date]:
-    return today, today + dt.timedelta(days=30)
+    """Retourne la plage de dates : aujourd'hui + 14 jours."""
+    return today, today + dt.timedelta(days=14)
 
 # ============================
 # Login + génération

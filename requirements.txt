@@ -4,4 +4,5 @@ beautifulsoup4>=4.12
 icalendar>=5.0
 pytz>=2023.0
 cryptography>=41.0
-apscheduler>=3.10gunicorn>=21.0
+apscheduler>=3.10
+gunicorn>=21.0
